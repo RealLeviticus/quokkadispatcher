@@ -158,46 +158,12 @@ end)
 -- ============================================================
 
 AddEventHandler('qd:fromClient', function(wsClientId, msgType, data)
-    -- LINK_DISPATCHER: associate a WebSocket client with a connected FiveM dispatcher player
-    if msgType == 'LINK_DISPATCHER' then
-        local license = data.license
-        if not license then
-            TriggerEvent('qd:ws:sendToClient', wsClientId, 'ERROR', { code = 'INVALID_LICENSE', message = 'No license provided' })
-            return
-        end
-
-        -- Find the dispatcher player with this license
-        for src, dispatcher in pairs(Dispatchers) do
-            local identifiers = GetPlayerIdentifiers(src)
-            for _, id in ipairs(identifiers) do
-                if id == license then
-                    dispatcher.wsClientId = wsClientId
-                    wsToSource[wsClientId] = src
-
-                    TriggerEvent('qd:ws:sendToClient', wsClientId, 'DISPATCHER_LINKED', {
-                        name = dispatcher.name,
-                        source = src,
-                    })
-
-                    print(('[QuokkaDispatcher] Linked WS client %s to dispatcher %s (source: %d)'):format(wsClientId, dispatcher.name, src))
-                    return
-                end
-            end
-        end
-
-        TriggerEvent('qd:ws:sendToClient', wsClientId, 'ERROR', {
-            code = 'DISPATCHER_NOT_FOUND',
-            message = 'No dispatcher player found with that license. Make sure FiveM is connected first.',
-        })
-        return
-    end
-
-    -- All other messages require a linked dispatcher
+    -- All messages now use the auto-registered dispatcher (no linking required)
     local dispatcher = GetDispatcherByWsClient(wsClientId)
     if not dispatcher then
         TriggerEvent('qd:ws:sendToClient', wsClientId, 'ERROR', {
             code = 'NOT_LINKED',
-            message = 'WebSocket client not linked to a dispatcher. Send LINK_DISPATCHER first.',
+            message = 'WebSocket client not linked to a dispatcher (auto-registration failed).',
         })
         return
     end

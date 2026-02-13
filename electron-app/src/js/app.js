@@ -66,6 +66,7 @@ class DispatcherApp {
             if (data.connected) {
                 ui.showStatus('Connected to server', 'success');
                 ui.setConnectionStatus(true);
+                this.dispatcherLinked = true; // Consider dispatcher linked on connect
             } else {
                 ui.showStatus('Disconnected from server', 'error');
                 ui.setConnectionStatus(false);
