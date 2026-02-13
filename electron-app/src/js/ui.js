@@ -11,8 +11,28 @@ class UIManager {
         this.incomingCalls = new Map();
         this.currentPlayers = new Map();
         this.callTimers = new Map();
-        
         this.initializeElements();
+
+        // PTT Key
+        this.pttKeyInput = document.getElementById('pttKeyInput');
+        this.pttKeyDisplay = document.getElementById('pttKeyDisplay');
+        this.pttKey = localStorage.getItem('qd_pttKey') || ' '; // Default: spacebar
+        this.updatePTTKeyDisplay();
+
+        // Listen for key input
+        if (this.pttKeyInput) {
+            this.pttKeyInput.value = this.pttKey;
+            this.pttKeyInput.addEventListener('keydown', (e) => {
+                e.preventDefault();
+                let key = e.key.length === 1 ? e.key : (e.code === 'Space' ? ' ' : '');
+                if (key) {
+                    this.pttKey = key;
+                    this.pttKeyInput.value = key;
+                    localStorage.setItem('qd_pttKey', key);
+                    this.updatePTTKeyDisplay();
+                }
+            });
+        }
     }
 
     initializeElements() {
@@ -47,27 +67,26 @@ class UIManager {
 
         // Audio
         this.incomingCallSound = document.getElementById('incomingCallSound');
-        
-        // PTT Key
-        this.pttKeyInput = document.getElementById('pttKeyInput');
-        this.pttKeyDisplay = document.getElementById('pttKeyDisplay');
-        this.pttKey = localStorage.getItem('qd_pttKey') || ' '; // Default: spacebar
-        this.updatePTTKeyDisplay();
-        
-        // Listen for key input
-        if (this.pttKeyInput) {
-            this.pttKeyInput.value = this.pttKey;
-            this.pttKeyInput.addEventListener('keydown', (e) => {
-                e.preventDefault();
-                let key = e.key.length === 1 ? e.key : (e.code === 'Space' ? ' ' : '');
-                if (key) {
-                    this.pttKey = key;
-                    this.pttKeyInput.value = key;
-                    localStorage.setItem('qd_pttKey', key);
-                    this.updatePTTKeyDisplay();
-                }
-            });
-        }
+        this.micClickOnSound = document.getElementById('micClickOnSound');
+        this.micClickOffSound = document.getElementById('micClickOffSound');
+    }
+
+    playMicClickOn() {
+        try {
+            if (this.micClickOnSound) {
+                this.micClickOnSound.currentTime = 0;
+                this.micClickOnSound.play().catch(() => {});
+            }
+        } catch {}
+    }
+
+    playMicClickOff() {
+        try {
+            if (this.micClickOffSound) {
+                this.micClickOffSound.currentTime = 0;
+                this.micClickOffSound.play().catch(() => {});
+            }
+        } catch {}
     }
 
     updatePTTKeyDisplay() {

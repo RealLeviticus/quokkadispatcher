@@ -142,6 +142,25 @@ end)
 
 AddEventHandler('qd:clientConnected', function(wsClientId)
     print(('[QuokkaDispatcher] WebSocket client connected: %s'):format(wsClientId))
+
+    -- Auto-register as dispatcher if not already linked
+    -- Find an unused virtual source ID (negative to avoid collision with player sources)
+    local virtualSource = -1
+    while Dispatchers[virtualSource] ~= nil do
+        virtualSource = virtualSource - 1
+    end
+
+    Dispatchers[virtualSource] = {
+        name = 'External Dispatcher',
+        source = virtualSource,
+        radioChannel = 0,
+        callChannel = 0,
+        activeCall = nil,
+        wsClientId = wsClientId,
+        talkingOnRadio = false,
+    }
+    wsToSource[wsClientId] = virtualSource
+    print(('[QuokkaDispatcher] Auto-registered external dispatcher (source: %d)'):format(virtualSource))
 end)
 
 AddEventHandler('qd:clientDisconnected', function(wsClientId)

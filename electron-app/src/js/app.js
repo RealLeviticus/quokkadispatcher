@@ -182,6 +182,7 @@ class DispatcherApp {
 
         this.pttPressed = true;
         ui.setPTTActive(true);
+        ui.playMicClickOn();
 
         if (this.wsClient) {
             this.wsClient.send('START_RADIO_TALK', {});
@@ -196,6 +197,7 @@ class DispatcherApp {
 
         this.pttPressed = false;
         ui.setPTTActive(false);
+        ui.playMicClickOff();
 
         if (this.wsClient) {
             this.wsClient.send('STOP_RADIO_TALK', {});
