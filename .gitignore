@@ -1,0 +1,17 @@
+/.claude
+nul
+/electron-app/node_modules/
+/electron-app/dist/
+/electron-app/.env
+/electron-app/.DS_Store
+/electron-app/*.log
+/fivem-resource/.DS_Store
+/fivem-resource/*.log
+# OS & Editor
+.vscode/
+*.log
+*.tmp
+*.swp
+Thumbs.db
+ehthumbs.db
+Desktop.ini
