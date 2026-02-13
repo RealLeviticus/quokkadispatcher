@@ -13,6 +13,7 @@ const VOICE_RELAY_PORT = 30130;
 const CONSUMER_PATH = '/voice-relay';
 const INGEST_PATH = '/voice-relay/ingest';
 const INGEST_ENDPOINT = `ws://127.0.0.1:${VOICE_RELAY_PORT}${INGEST_PATH}`;
+const LOCAL_VOICE_BRIDGE_ENABLED = process.env.QD_LOCAL_VOICE_BRIDGE !== '0';
 
 function splitArgs(value) {
     if (!value) return [];
@@ -188,11 +189,8 @@ function startVoiceRelayServer() {
                 return;
             }
 
-            ws.on('message', (data, isBinary) => {
-                if (ws.role !== 'producer') {
-                    return;
-                }
-
+        ws.on('message', (data, isBinary) => {
+            if (ws.role === 'producer') {
                 if (isBinary) {
                     for (const consumer of consumers) {
                         if (consumer.readyState === 1) {
@@ -209,7 +207,19 @@ function startVoiceRelayServer() {
                         consumer.send(text);
                     }
                 }
-            });
+                return;
+            }
+
+            if (ws.role === 'consumer' && !isBinary) {
+                // Pass control metadata from renderer to producers.
+                const text = data.toString();
+                for (const producer of producers) {
+                    if (producer.readyState === 1) {
+                        producer.send(text);
+                    }
+                }
+            }
+        });
 
             ws.on('close', () => removeSocket(ws));
             ws.on('error', () => removeSocket(ws));
@@ -267,8 +277,10 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-    await startVoiceRelayServer();
-    startAudioForwarder();
+    if (LOCAL_VOICE_BRIDGE_ENABLED) {
+        await startVoiceRelayServer();
+        startAudioForwarder();
+    }
     createWindow();
 });
 
@@ -283,9 +295,11 @@ app.on('activate', () => {
 });
 
 app.on('before-quit', () => {
-    if (voiceRelay) {
+    if (LOCAL_VOICE_BRIDGE_ENABLED && voiceRelay) {
         voiceRelay.close();
         voiceRelay = null;
     }
-    stopAudioForwarder();
+    if (LOCAL_VOICE_BRIDGE_ENABLED) {
+        stopAudioForwarder();
+    }
 });

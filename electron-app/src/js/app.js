@@ -9,8 +9,31 @@ class DispatcherApp {
         this.dispatcherLinked = false;
         this.pttPressed = false;
         this.channelJoined = false;
+        this.voiceContext = {
+            source: 1, // 1=radio, 2=000/call
+            radio: { channel: 0, talking: false },
+            call: { active: false, callId: null },
+        };
+        this.wsSessionId = null;
 
         this.setupEventListeners();
+    }
+
+    pushVoiceContext() {
+        ui.updateVoiceContext(this.voiceContext);
+    }
+
+    deriveVoiceRelayUrl(serverUrl, wsClientId) {
+        try {
+            const url = new URL(serverUrl);
+            url.port = '30130';
+            url.pathname = '/voice/dispatcher';
+            url.search = wsClientId ? `wsClientId=${encodeURIComponent(wsClientId)}` : '';
+            url.hash = '';
+            return url.toString();
+        } catch {
+            return null;
+        }
     }
 
     setupEventListeners() {
@@ -55,12 +78,17 @@ class DispatcherApp {
      */
     connect() {
         const config = ui.getConnectionConfig();
+        const localBridgeMode = window.electronAPI?.localVoiceBridge !== false;
         if (!config.serverUrl) {
             ui.showStatus('Server URL is required', 'error');
             return;
         }
         ui.showStatus('Connecting...', 'info');
         this.wsClient = new DispatcherWSClient(config.serverUrl);
+        this.wsSessionId = null;
+        if (localBridgeMode) {
+            ui.setupVoiceRelay('ws://127.0.0.1:30130/voice-relay');
+        }
         // Message handlers
         this.wsClient.on('_connectionStateChanged', (data) => {
             if (data.connected) {
@@ -88,6 +116,9 @@ class DispatcherApp {
             ui.updateCurrentChannel();
             ui.showStatus(`Joined radio channel ${data.channel}`, 'success');
             console.log('Joined channel:', data.channel);
+            this.voiceContext.radio.channel = data.channel || 0;
+            this.voiceContext.source = 1;
+            this.pushVoiceContext();
         });
         this.wsClient.on('RADIO_LEFT', (data) => {
             this.channelJoined = false;
@@ -95,6 +126,9 @@ class DispatcherApp {
             ui.updateCurrentChannel();
             ui.updateRadioPlayers([]);
             ui.showStatus(`Left radio channel ${data.channel}`, 'info');
+            this.voiceContext.radio.channel = 0;
+            this.voiceContext.radio.talking = false;
+            this.pushVoiceContext();
         });
         this.wsClient.on('RADIO_STATE', (data) => {
             if (ui.currentChannel === data.channel) {
@@ -107,6 +141,25 @@ class DispatcherApp {
         });
         this.wsClient.on('PONG', (data) => {
             // Keep-alive response, ignore
+        });
+        this.wsClient.on('WS_SESSION', (data) => {
+            if (!data || !data.wsClientId) return;
+            this.wsSessionId = data.wsClientId;
+            if (localBridgeMode) {
+                return;
+            }
+            const voiceRelayUrl = this.deriveVoiceRelayUrl(config.serverUrl, this.wsSessionId);
+            if (voiceRelayUrl) {
+                ui.setupVoiceRelay(voiceRelayUrl);
+                this.pushVoiceContext();
+            }
+        });
+        this.wsClient.on('VOICE_CONTEXT', (data) => {
+            this.voiceContext = {
+                ...this.voiceContext,
+                ...data,
+            };
+            this.pushVoiceContext();
         });
         // Connect to server
         this.wsClient.connect();
@@ -123,7 +176,15 @@ class DispatcherApp {
         this.dispatcherLinked = false;
         ui.setConnectionStatus(false);
         ui.clearCallState();
+        ui.disconnectVoiceRelay();
         ui.showStatus('Disconnected', 'info');
+        this.wsSessionId = null;
+        this.voiceContext = {
+            source: 1,
+            radio: { channel: 0, talking: false },
+            call: { active: false, callId: null },
+        };
+        this.pushVoiceContext();
     }
 
     /**
@@ -187,6 +248,9 @@ class DispatcherApp {
         if (this.wsClient) {
             this.wsClient.send('START_RADIO_TALK', {});
         }
+        this.voiceContext.radio.talking = true;
+        this.voiceContext.source = 1;
+        this.pushVoiceContext();
     }
 
     /**
@@ -202,6 +266,8 @@ class DispatcherApp {
         if (this.wsClient) {
             this.wsClient.send('STOP_RADIO_TALK', {});
         }
+        this.voiceContext.radio.talking = false;
+        this.pushVoiceContext();
     }
 
     /**
@@ -241,6 +307,10 @@ class DispatcherApp {
             ui.showActiveCall(data.callId, call.callerName, call.callerSource);
             ui.showStatus(`Call answered with ${call.callerName}`, 'success');
         }
+        this.voiceContext.call.active = true;
+        this.voiceContext.call.callId = data.callId;
+        this.voiceContext.source = 2;
+        this.pushVoiceContext();
     }
 
     /**
@@ -282,6 +352,12 @@ class DispatcherApp {
             ui.showStatus('Call ended', 'info');
         }
         ui.removeIncomingCall(data.callId);
+        if (this.voiceContext.call.callId === data.callId) {
+            this.voiceContext.call.active = false;
+            this.voiceContext.call.callId = null;
+            this.voiceContext.source = 1;
+            this.pushVoiceContext();
+        }
     }
 
     /**

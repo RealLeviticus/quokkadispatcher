@@ -61,6 +61,7 @@ quokkadispatcher/
    ```
    ensure quokkadispatcher
    set qd_ws_port 30125
+   set qd_voice_ws_port 30130
    set qd_auth_token your-secure-random-token-here
    ```
 
@@ -117,7 +118,17 @@ npm run build
 - **RADIO_JOINED**: Successfully joined radio channel (channel number)
 - **RADIO_LEFT**: Left radio channel (channel number)
 - **RADIO_STATE**: Current players on radio channel
+- **VOICE_CONTEXT**: Current voice context (`source=1 radio`, `source=2 call`)
 - **ERROR**: Error message
+
+## Voice Relay Protocol
+
+QuokkaDispatcher now hosts a server-side voice relay endpoint:
+
+- Dispatcher playback: `ws://<server-ip>:30130/voice/dispatcher`
+- Voice ingest (external voice backend): `ws://<server-ip>:30130/voice/ingest`
+
+The Electron app derives the playback URL from the control WebSocket host and connects automatically.
 
 ## Configuration
 
@@ -171,3 +182,37 @@ For issues or questions, ensure:
 2. The WebSocket server is listening (check server logs)
 3. Your firewall isn't blocking the WebSocket port
 4. Your FiveM license is in the DispatcherIdentifiers list
+
+## Voice Session Binding
+
+Control WebSocket now sends a `WS_SESSION` message with `wsClientId` on connect. Electron uses this ID when connecting to `/voice/dispatcher` so server-side voice routing can follow each dispatcher's current radio/call context.
+
+## Voice Ingest Routing Header (`QDRT`)
+
+Producers sending to `ws://<server-ip>:30130/voice/ingest` should send binary frames with:
+
+- `magic` (4): ASCII `QDRT`
+- `version` (u8): `1`
+- `sourceType` (u8): `1=radio`, `2=call`
+- `routeId` (u16 LE): radio channel or call channel ID
+- `payloadLen` (u16 LE): payload size
+- `payload`: audio packet bytes (recommended `QDAV` payload)
+
+The relay forwards payload only to dispatchers whose context matches `routeId` for that source type.
+
+## Server Export For pma-voice Forks
+
+If your pma-voice fork/backend can access voice packet bytes, you can ingest directly via export:
+
+```lua
+exports['quokkadispatcher']:ingestRoutedVoicePayload(sourceType, routeId, payloadB64)
+```
+
+- `sourceType`: `1` for radio, `2` for call
+- `routeId`: radio channel or call channel ID
+- `payloadB64`: base64 encoded `QDAV` packet bytes
+
+Patch template files are included at:
+
+- `QuokkaDispatcher/integrations/pma-voice/PATCH_TEMPLATE.md`
+- `QuokkaDispatcher/integrations/pma-voice/example_qdav_forward.lua`

@@ -64,6 +64,15 @@ function RouteCallToDispatcher(callerSource, callerName)
         callerName = displayName,
         callerSource = callerSource,
     })
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 1,
+        call = {
+            ringing = true,
+            active = false,
+            callId = callId,
+            callerSource = callerSource,
+        },
+    })
 
     print(('[QuokkaDispatcher] Call %d from %s routed to dispatcher %s'):format(callId, displayName, dispatcher.name))
     return true
@@ -164,6 +173,18 @@ AddEventHandler('qd:phone:answerCall', function(dispatcherSource, callId)
 
     -- Notify Electron app
     SendToDispatcher(dispatcher, 'CALL_ANSWERED', { callId = callId })
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 2,
+        call = {
+            ringing = false,
+            active = true,
+            callId = callId,
+            callerSource = call.callerSource,
+        },
+    })
+    TriggerEvent('qd:voice:setDispatcherContext', dispatcher.wsClientId, {
+        callChannel = call.callChannelId,
+    })
 
     print(('[QuokkaDispatcher] Call %d answered by %s'):format(callId, dispatcher.name))
 end)
@@ -202,6 +223,18 @@ AddEventHandler('qd:phone:endCall', function(dispatcherSource, callId)
     pendingCalls[callId] = nil
 
     SendToDispatcher(dispatcher, 'CALL_ENDED', { callId = callId })
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 1,
+        call = {
+            ringing = false,
+            active = false,
+            callId = nil,
+            callerSource = nil,
+        },
+    })
+    TriggerEvent('qd:voice:setDispatcherContext', dispatcher.wsClientId, {
+        callChannel = 0,
+    })
 
     print(('[QuokkaDispatcher] Call %d ended by %s'):format(callId, dispatcher.name))
 end)
@@ -229,6 +262,18 @@ AddEventHandler('qd:phone:rejectCall', function(dispatcherSource, callId)
     pendingCalls[callId] = nil
 
     SendToDispatcher(dispatcher, 'CALL_ENDED', { callId = callId })
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 1,
+        call = {
+            ringing = false,
+            active = false,
+            callId = nil,
+            callerSource = nil,
+        },
+    })
+    TriggerEvent('qd:voice:setDispatcherContext', dispatcher.wsClientId, {
+        callChannel = 0,
+    })
 
     print(('[QuokkaDispatcher] Call %d rejected by %s'):format(callId, dispatcher.name))
 end)
@@ -252,6 +297,18 @@ AddEventHandler('playerDropped', function()
                     dispatcher.activeCall = nil
                     dispatcher.callChannel = 0
                     SendToDispatcher(dispatcher, 'CALL_ENDED', { callId = callId })
+                    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+                        source = 1,
+                        call = {
+                            ringing = false,
+                            active = false,
+                            callId = nil,
+                            callerSource = nil,
+                        },
+                    })
+                    TriggerEvent('qd:voice:setDispatcherContext', dispatcher.wsClientId, {
+                        callChannel = 0,
+                    })
                 end
             end
             pendingCalls[callId] = nil

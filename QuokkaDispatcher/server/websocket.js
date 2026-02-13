@@ -36,6 +36,7 @@ function startServer() {
         clients.set(clientId, { ws, dispatcherSource: null });
         emit('qd:clientConnected', clientId);
         console.log(`[QuokkaDispatcher] Client connected: ${clientId}`);
+        ws.send(JSON.stringify({ type: 'WS_SESSION', data: { wsClientId: clientId } }));
 
         ws.on('message', (raw) => {
             let msg;

@@ -417,16 +417,27 @@ class UIManager {
     /**
      * Voice relay: play incoming audio stream from server
      */
-    setupVoiceRelay() {
-        // Connect to the relay WebSocket (adjust port/path as needed)
-        this.voiceSocket = new WebSocket('ws://localhost:30130/voice-relay');
+    setupVoiceRelay(voiceRelayUrl) {
+        if (!voiceRelayUrl) return;
+        if (!this.lastVoiceContext) this.lastVoiceContext = null;
+        if (this.voiceSocket && this.voiceRelayUrl === voiceRelayUrl && this.voiceSocket.readyState === 1) return;
+        this.disconnectVoiceRelay();
+        this.voiceRelayUrl = voiceRelayUrl;
+
+        this.voiceSocket = new WebSocket(voiceRelayUrl);
         this.voiceSocket.binaryType = 'arraybuffer';
+        this.voiceRelayConnected = false;
 
         this.voiceSocket.onopen = () => {
             console.log('Voice relay WebSocket connected');
+            this.voiceRelayConnected = true;
+            if (this.lastVoiceContext) {
+                this.sendVoiceControl('VOICE_CONTEXT', this.lastVoiceContext);
+            }
         };
         this.voiceSocket.onclose = () => {
             console.log('Voice relay WebSocket disconnected');
+            this.voiceRelayConnected = false;
         };
         this.voiceSocket.onerror = (e) => {
             console.warn('Voice relay WebSocket error:', e);
@@ -444,6 +455,31 @@ class UIManager {
 
             this.playIncomingAudio(event.data);
         };
+    }
+
+    disconnectVoiceRelay() {
+        if (this.voiceSocket) {
+            try {
+                this.voiceSocket.close();
+            } catch {}
+            this.voiceSocket = null;
+        }
+        this.voiceRelayUrl = null;
+        this.voiceRelayConnected = false;
+    }
+
+    sendVoiceControl(type, data) {
+        if (!this.voiceSocket || this.voiceSocket.readyState !== 1) return;
+        try {
+            this.voiceSocket.send(JSON.stringify({ type, data }));
+        } catch {}
+    }
+
+    updateVoiceContext(context) {
+        this.lastVoiceContext = context;
+        if (this.voiceRelayConnected) {
+            this.sendVoiceControl('VOICE_CONTEXT', context);
+        }
     }
 
     playIncomingAudio(arrayBuffer) {
@@ -505,4 +541,3 @@ class UIManager {
 
 // Create global UI manager instance
 const ui = new UIManager();
-ui.setupVoiceRelay();

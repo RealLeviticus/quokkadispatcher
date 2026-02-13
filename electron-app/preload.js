@@ -5,4 +5,5 @@ const { contextBridge } = require('electron');
 // so no Node.js modules are needed in the renderer process.
 contextBridge.exposeInMainWorld('electronAPI', {
     platform: process.platform,
+    localVoiceBridge: process.env.QD_LOCAL_VOICE_BRIDGE !== '0',
 });

@@ -131,6 +131,7 @@ AddEventHandler('playerDropped', function(reason)
     -- Remove WS mapping
     if dispatcher.wsClientId then
         wsToSource[dispatcher.wsClientId] = nil
+        TriggerEvent('qd:voice:clearDispatcherContext', dispatcher.wsClientId)
     end
 
     Dispatchers[src] = nil
@@ -161,6 +162,24 @@ AddEventHandler('qd:clientConnected', function(wsClientId)
     }
     wsToSource[wsClientId] = virtualSource
     print(('[QuokkaDispatcher] Auto-registered external dispatcher (source: %d)'):format(virtualSource))
+
+    TriggerEvent('qd:ws:sendToClient', wsClientId, 'VOICE_CONTEXT', {
+        source = 1,
+        radio = {
+            channel = 0,
+            talking = false,
+        },
+        call = {
+            ringing = false,
+            active = false,
+            callId = nil,
+            callerSource = nil,
+        },
+    })
+    TriggerEvent('qd:voice:setDispatcherContext', wsClientId, {
+        radioChannel = 0,
+        callChannel = 0,
+    })
 end)
 
 AddEventHandler('qd:clientDisconnected', function(wsClientId)
@@ -169,6 +188,7 @@ AddEventHandler('qd:clientDisconnected', function(wsClientId)
         print(('[QuokkaDispatcher] WebSocket client disconnected for dispatcher: %s'):format(Dispatchers[src].name))
         Dispatchers[src].wsClientId = nil
     end
+    TriggerEvent('qd:voice:clearDispatcherContext', wsClientId)
     wsToSource[wsClientId] = nil
 end)
 
@@ -223,6 +243,15 @@ end)
 ---@return table<number, DispatcherData>
 exports('getActiveDispatchers', function()
     return Dispatchers
+end)
+
+---Ingest routed voice payload into dispatcher voice relay.
+---Use from a pma-voice fork/backend that can access raw voice packets.
+---@param sourceType number 1=radio, 2=call
+---@param routeId number radio channel or call channel id
+---@param payloadB64 string base64 encoded QDAV packet
+exports('ingestRoutedVoicePayload', function(sourceType, routeId, payloadB64)
+    TriggerEvent('qd:voice:ingestRoutedPayload', sourceType, routeId, payloadB64)
 end)
 
 print('[QuokkaDispatcher] Server resource loaded')

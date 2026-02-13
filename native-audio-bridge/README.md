@@ -31,7 +31,8 @@ Header size is fixed at 24 bytes.
 - Electron relay: implemented (binary + metadata passthrough).
 - Electron playback: implemented for PCM16 packets.
 - Opus playback: transport-ready; decoder hookup still pending.
-- Rust forwarder: implemented with a synthetic audio source for bring-up.
+- Rust forwarder: implemented with Windows WASAPI process loopback capture.
+- Live source control: implemented via `VOICE_CONTEXT` JSON from Electron (`source=1` radio, `source=2` call).
 - C++ forwarder: packet builder + interface stubs ready for capture integration.
 
 ## Rust quick start
@@ -41,8 +42,20 @@ cd native-audio-bridge/rust-forwarder
 cargo run -- --endpoint ws://127.0.0.1:30130/voice-relay/ingest --codec pcm16
 ```
 
-This sends test PCM packets so you can verify end-to-end relay and playback.
+On Windows, this now captures real audio from the FiveM process automatically (process name match).
+
+Optional explicit process ID:
+
+```powershell
+cargo run -- --endpoint ws://127.0.0.1:30130/voice-relay/ingest --codec pcm16 --process-id 12345
+```
 
 ## Next integration step
 
-Replace the synthetic source in `rust-forwarder/src/main.rs` (or implement the C++ sender) with your in-game capture callback that yields Opus or PCM frames tagged as radio (`source=1`) or `/000` (`source=2`).
+To bundle for dispatcher deployment:
+
+```powershell
+cd native-audio-bridge/rust-forwarder
+cargo build --release
+Copy-Item .\\target\\release\\qd-audio-forwarder.exe ..\\..\\electron-app\\bin\\qd-audio-forwarder.exe -Force
+```

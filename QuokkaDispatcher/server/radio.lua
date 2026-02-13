@@ -46,6 +46,16 @@ AddEventHandler('qd:radio:joinChannel', function(dispatcherSource, channel)
     TriggerClientEvent('qd:client:radioChannelChanged', dispatcherSource, channel)
 
     SendToDispatcher(dispatcher, 'RADIO_JOINED', { channel = channel })
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 1,
+        radio = {
+            channel = channel,
+            talking = dispatcher.talkingOnRadio or false,
+        },
+    })
+    TriggerEvent('qd:voice:setDispatcherContext', dispatcher.wsClientId, {
+        radioChannel = channel,
+    })
 
     print(('[QuokkaDispatcher] %s joined radio channel %d'):format(dispatcher.name, channel))
 end)
@@ -71,6 +81,16 @@ AddEventHandler('qd:radio:leaveChannel', function(dispatcherSource)
     TriggerClientEvent('qd:client:radioChannelChanged', dispatcherSource, 0)
 
     SendToDispatcher(dispatcher, 'RADIO_LEFT', { channel = prevChannel })
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 1,
+        radio = {
+            channel = 0,
+            talking = false,
+        },
+    })
+    TriggerEvent('qd:voice:setDispatcherContext', dispatcher.wsClientId, {
+        radioChannel = 0,
+    })
 
     print(('[QuokkaDispatcher] %s left radio channel %d'):format(dispatcher.name, prevChannel))
 end)
@@ -85,6 +105,13 @@ AddEventHandler('qd:radio:startTalk', function(dispatcherSource)
 
     dispatcher.talkingOnRadio = true
     TriggerClientEvent('qd:client:setRadioTalking', dispatcherSource, true)
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 1,
+        radio = {
+            channel = dispatcher.radioChannel,
+            talking = true,
+        },
+    })
 end)
 
 AddEventHandler('qd:radio:stopTalk', function(dispatcherSource)
@@ -93,6 +120,13 @@ AddEventHandler('qd:radio:stopTalk', function(dispatcherSource)
 
     dispatcher.talkingOnRadio = false
     TriggerClientEvent('qd:client:setRadioTalking', dispatcherSource, false)
+    SendToDispatcher(dispatcher, 'VOICE_CONTEXT', {
+        source = 1,
+        radio = {
+            channel = dispatcher.radioChannel,
+            talking = false,
+        },
+    })
 end)
 
 -- ============================================================

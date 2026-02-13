@@ -20,6 +20,7 @@ server_scripts {
     'server/main.lua',
     'server/radio.lua',
     'server/phone.lua',
+    'server/voice-relay.js',
     'server/websocket.js',
 }
 
