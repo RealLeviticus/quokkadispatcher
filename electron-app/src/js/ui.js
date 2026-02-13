@@ -43,8 +43,7 @@ class UIManager {
         this.endCallBtn = document.getElementById('endCallBtn');
         this.closeCallViewBtn = document.getElementById('closeCallViewBtn');
 
-        // Input field
-        this.serverUrlInput = document.getElementById('serverUrl');
+        // Server URL input removed; server URL is now hard-coded in logic
 
         // Audio
         this.incomingCallSound = document.getElementById('incomingCallSound');
@@ -123,7 +122,7 @@ class UIManager {
      */
     getConnectionConfig() {
         return {
-            serverUrl: this.serverUrlInput.value.trim(),
+            serverUrl: 'ws://103.203.241.35:30125',
         };
     }
 

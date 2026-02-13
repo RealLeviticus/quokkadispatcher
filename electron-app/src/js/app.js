@@ -295,24 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('[QuokkaDispatcher] Initializing...');
 
     // Load saved settings from localStorage
-    const savedServerUrl = localStorage.getItem('qd_serverUrl');
-    const savedAuthToken = localStorage.getItem('qd_authToken');
-    const savedLicense = localStorage.getItem('qd_dispatcherLicense');
 
-    if (savedServerUrl) ui.serverUrlInput.value = savedServerUrl;
-    if (savedAuthToken) ui.authTokenInput.value = savedAuthToken;
-    if (savedLicense) ui.dispatcherLicenseInput.value = savedLicense;
-
-    // Save settings to localStorage when changed
-    const saveSettings = () => {
-        localStorage.setItem('qd_serverUrl', ui.serverUrlInput.value);
-        localStorage.setItem('qd_authToken', ui.authTokenInput.value);
-        localStorage.setItem('qd_dispatcherLicense', ui.dispatcherLicenseInput.value);
-    };
-
-    ui.serverUrlInput.addEventListener('change', saveSettings);
-    ui.authTokenInput.addEventListener('change', saveSettings);
-    ui.dispatcherLicenseInput.addEventListener('change', saveSettings);
+    // Server URL is now hard-coded; no need to load or save
 
     // Create app instance
     window.dispatcherApp = new DispatcherApp();

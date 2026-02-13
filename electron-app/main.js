@@ -22,6 +22,9 @@ function createWindow() {
 
     // Remove default menu bar
     mainWindow.setMenuBarVisibility(false);
+
+    // Open DevTools automatically for debugging
+    mainWindow.webContents.openDevTools();
 }
 
 app.whenReady().then(createWindow);

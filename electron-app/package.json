@@ -5,7 +5,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "dev": "electron ."
   },
   "dependencies": {
     "ws": "^8.19.0"

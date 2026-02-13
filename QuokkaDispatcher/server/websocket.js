@@ -24,8 +24,7 @@ function startServer() {
     });
 
     wss.on('connection', (ws, req) => {
-        let authenticated = false;
-        let clientId = null;
+        let clientId = `client-${Date.now()}-${Math.floor(Math.random()*10000)}`;
         const remoteAddr = req.socket.remoteAddress;
 
         console.log(`[QuokkaDispatcher] New WebSocket connection from ${remoteAddr}`);
@@ -33,6 +32,10 @@ function startServer() {
         // Set up ping/pong for keep-alive
         ws.isAlive = true;
         ws.on('pong', () => { ws.isAlive = true; });
+
+        clients.set(clientId, { ws, dispatcherSource: null });
+        emit('qd:clientConnected', clientId);
+        console.log(`[QuokkaDispatcher] Client connected: ${clientId}`);
 
         ws.on('message', (raw) => {
             let msg;
@@ -42,33 +45,14 @@ function startServer() {
                 ws.send(JSON.stringify({ type: 'ERROR', data: { code: 'INVALID_JSON', message: 'Invalid JSON' } }));
                 return;
             }
-
-            // First message must be AUTH
-            if (!authenticated) {
-                if (msg.type === 'AUTH' && msg.token === AUTH_TOKEN) {
-                    authenticated = true;
-                    clientId = msg.clientId || `client-${Date.now()}`;
-                    clients.set(clientId, { ws, dispatcherSource: null });
-                    ws.send(JSON.stringify({ type: 'AUTH_OK', data: {} }));
-                    emit('qd:clientConnected', clientId);
-                    console.log(`[QuokkaDispatcher] Client authenticated: ${clientId}`);
-                } else {
-                    ws.send(JSON.stringify({ type: 'AUTH_FAILED', data: { reason: 'Invalid token' } }));
-                    ws.close();
-                }
-                return;
-            }
-
-            // Forward authenticated messages to Lua
+            // Forward all messages to Lua
             emit('qd:fromClient', clientId, msg.type, msg.data || {});
         });
 
         ws.on('close', () => {
-            if (clientId) {
-                console.log(`[QuokkaDispatcher] Client disconnected: ${clientId}`);
-                emit('qd:clientDisconnected', clientId);
-                clients.delete(clientId);
-            }
+            console.log(`[QuokkaDispatcher] Client disconnected: ${clientId}`);
+            emit('qd:clientDisconnected', clientId);
+            clients.delete(clientId);
         });
 
         ws.on('error', (err) => {
