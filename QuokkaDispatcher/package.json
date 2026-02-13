@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "WebSocket server for QuokkaDispatcher FiveM resource",
   "dependencies": {
-    "ws": "^8.16.0"
+    "ws": "^8.19.0"
   }
 }
