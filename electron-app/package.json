@@ -27,6 +27,15 @@
       "preload.js",
       "src/**/*",
       "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
     ]
   }
 }

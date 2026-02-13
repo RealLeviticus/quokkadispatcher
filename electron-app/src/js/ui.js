@@ -205,6 +205,10 @@ class UIManager {
     removeIncomingCall(callId) {
         this.incomingCalls.delete(callId);
         this.updateIncomingCallsList();
+        // Stop ringtone if no more incoming calls
+        if (this.incomingCalls.size === 0) {
+            this.stopIncomingCallSound();
+        }
     }
 
     /**
@@ -266,6 +270,9 @@ class UIManager {
 
         // Remove from incoming calls
         this.removeIncomingCall(callId);
+
+        // Stop ringtone immediately when call is picked up
+        this.stopIncomingCallSound();
     }
 
     /**
@@ -345,15 +352,29 @@ class UIManager {
      * Play incoming call sound (once)
      */
     playIncomingCallSound() {
-        try {
-            if (this.incomingCallSound && this.incomingCallSound.paused) {
-                this.incomingCallSound.currentTime = 0;
-                this.incomingCallSound.play().catch(e => {
-                    console.warn('Could not play incoming call sound:', e);
-                });
-            }
-        } catch (e) {
-            console.warn('Error playing sound:', e);
+        // If already playing/looping, do nothing
+        if (this._incomingCallLoopTimer) return;
+        if (!this.incomingCallSound) return;
+
+        this.incomingCallSound.currentTime = 0;
+        this.incomingCallSound.loop = true;
+        this.incomingCallSound.play().catch(() => {});
+
+        // Stop after 15 seconds if not answered
+        this._incomingCallLoopTimer = setTimeout(() => {
+            this.stopIncomingCallSound();
+        }, 15000);
+    }
+
+    stopIncomingCallSound() {
+        if (this.incomingCallSound) {
+            this.incomingCallSound.pause();
+            this.incomingCallSound.currentTime = 0;
+            this.incomingCallSound.loop = false;
+        }
+        if (this._incomingCallLoopTimer) {
+            clearTimeout(this._incomingCallLoopTimer);
+            this._incomingCallLoopTimer = null;
         }
     }
 
@@ -390,8 +411,98 @@ class UIManager {
         this.hideActiveCall();
         this.updateIncomingCallsList();
         this.updateRadioPlayers([]);
+        this.stopIncomingCallSound();
+    }
+
+    /**
+     * Voice relay: play incoming audio stream from server
+     */
+    setupVoiceRelay() {
+        // Connect to the relay WebSocket (adjust port/path as needed)
+        this.voiceSocket = new WebSocket('ws://localhost:30130/voice-relay');
+        this.voiceSocket.binaryType = 'arraybuffer';
+
+        this.voiceSocket.onopen = () => {
+            console.log('Voice relay WebSocket connected');
+        };
+        this.voiceSocket.onclose = () => {
+            console.log('Voice relay WebSocket disconnected');
+        };
+        this.voiceSocket.onerror = (e) => {
+            console.warn('Voice relay WebSocket error:', e);
+        };
+        this.voiceSocket.onmessage = (event) => {
+            if (typeof event.data === 'string') {
+                try {
+                    const msg = JSON.parse(event.data);
+                    if (msg.type === 'VOICE_RELAY_READY') {
+                        console.log('Voice relay ready:', msg.data);
+                    }
+                } catch {}
+                return;
+            }
+
+            this.playIncomingAudio(event.data);
+        };
+    }
+
+    playIncomingAudio(arrayBuffer) {
+        // Quokka packet framing:
+        // magic(4) version(1) source(1) codec(1) channels(1) sampleRate(u16) payloadLen(u16) seq(u32) timestampMs(u64)
+        const packet = this.parseVoicePacket(arrayBuffer);
+        if (!packet) return;
+
+        // Opus payload forwarding is supported at transport level but decoder hookup is pending.
+        if (packet.codec !== 2) return;
+
+        const audioCtx = this._audioCtx || (this._audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+        const pcm = new Int16Array(packet.payload);
+        const frameCount = Math.floor(pcm.length / packet.channels);
+        if (frameCount <= 0) return;
+
+        const buffer = audioCtx.createBuffer(packet.channels, frameCount, packet.sampleRate);
+        for (let ch = 0; ch < packet.channels; ch++) {
+            const channelData = buffer.getChannelData(ch);
+            for (let frame = 0; frame < frameCount; frame++) {
+                const sampleIndex = frame * packet.channels + ch;
+                channelData[frame] = pcm[sampleIndex] / 32768;
+            }
+        }
+        const src = audioCtx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(audioCtx.destination);
+        src.start();
+    }
+
+    parseVoicePacket(arrayBuffer) {
+        if (!(arrayBuffer instanceof ArrayBuffer)) return null;
+        if (arrayBuffer.byteLength < 24) return null;
+
+        const view = new DataView(arrayBuffer);
+        const magic =
+            String.fromCharCode(view.getUint8(0)) +
+            String.fromCharCode(view.getUint8(1)) +
+            String.fromCharCode(view.getUint8(2)) +
+            String.fromCharCode(view.getUint8(3));
+
+        if (magic !== 'QDAV') return null;
+
+        const version = view.getUint8(4);
+        if (version !== 1) return null;
+
+        const codec = view.getUint8(6); // 1=Opus, 2=PCM16LE
+        const channels = view.getUint8(7);
+        const sampleRate = view.getUint16(8, true);
+        const payloadLen = view.getUint16(10, true);
+        const payloadOffset = 24;
+
+        if (payloadOffset + payloadLen > arrayBuffer.byteLength) return null;
+        const payload = arrayBuffer.slice(payloadOffset, payloadOffset + payloadLen);
+
+        return { codec, channels, sampleRate, payload };
     }
 }
 
 // Create global UI manager instance
 const ui = new UIManager();
+ui.setupVoiceRelay();
