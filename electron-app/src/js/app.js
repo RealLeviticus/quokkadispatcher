@@ -55,65 +55,32 @@ class DispatcherApp {
      */
     connect() {
         const config = ui.getConnectionConfig();
-
         if (!config.serverUrl) {
             ui.showStatus('Server URL is required', 'error');
             return;
         }
-        if (!config.authToken) {
-            ui.showStatus('Auth token is required', 'error');
-            return;
-        }
-        if (!config.dispatcherLicense) {
-            ui.showStatus('Dispatcher license is required', 'error');
-            return;
-        }
-
         ui.showStatus('Connecting...', 'info');
-
-        this.wsClient = new DispatcherWSClient(config.serverUrl, config.authToken);
-
-        // Connection state listeners
+        this.wsClient = new DispatcherWSClient(config.serverUrl);
+        // Message handlers
         this.wsClient.on('_connectionStateChanged', (data) => {
             if (data.connected) {
                 ui.showStatus('Connected to server', 'success');
                 ui.setConnectionStatus(true);
-                // Now try to link dispatcher
-                this.linkDispatcher(config.dispatcherLicense);
             } else {
                 ui.showStatus('Disconnected from server', 'error');
                 ui.setConnectionStatus(false);
                 this.dispatcherLinked = false;
             }
         });
-
-        this.wsClient.on('_authStateChanged', (data) => {
-            if (data.authenticated) {
-                ui.showStatus('Authenticated', 'success');
-            } else {
-                ui.showStatus(`Auth failed: ${data.reason || 'Invalid token'}`, 'error');
-            }
-        });
-
-        // Message handlers
-        this.wsClient.on('DISPATCHER_LINKED', (data) => {
-            this.dispatcherLinked = true;
-            ui.showStatus(`Linked as dispatcher: ${data.name}`, 'success');
-            console.log('Dispatcher linked:', data);
-        });
-
         this.wsClient.on('INCOMING_CALL', (data) => {
             this.handleIncomingCall(data);
         });
-
         this.wsClient.on('CALL_ANSWERED', (data) => {
             this.handleCallAnswered(data);
         });
-
         this.wsClient.on('CALL_ENDED', (data) => {
             this.handleCallEnded(data);
         });
-
         this.wsClient.on('RADIO_JOINED', (data) => {
             this.channelJoined = true;
             ui.currentChannel = data.channel;
@@ -121,7 +88,6 @@ class DispatcherApp {
             ui.showStatus(`Joined radio channel ${data.channel}`, 'success');
             console.log('Joined channel:', data.channel);
         });
-
         this.wsClient.on('RADIO_LEFT', (data) => {
             this.channelJoined = false;
             ui.currentChannel = 0;
@@ -129,22 +95,18 @@ class DispatcherApp {
             ui.updateRadioPlayers([]);
             ui.showStatus(`Left radio channel ${data.channel}`, 'info');
         });
-
         this.wsClient.on('RADIO_STATE', (data) => {
             if (ui.currentChannel === data.channel) {
                 ui.updateRadioPlayers(data.players);
             }
         });
-
         this.wsClient.on('ERROR', (data) => {
             ui.showStatus(`Error: ${data.message || data.code}`, 'error');
             console.error('Server error:', data);
         });
-
         this.wsClient.on('PONG', (data) => {
             // Keep-alive response, ignore
         });
-
         // Connect to server
         this.wsClient.connect();
     }
@@ -354,6 +316,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create app instance
     window.dispatcherApp = new DispatcherApp();
+
+    // Global PTT keydown/keyup
+    let pttKeyDown = false;
+    window.addEventListener('keydown', (e) => {
+        if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+        const key = e.key.length === 1 ? e.key : (e.code === 'Space' ? ' ' : '');
+        if (!pttKeyDown && key && key.toLowerCase() === ui.pttKey.toLowerCase()) {
+            pttKeyDown = true;
+            window.dispatcherApp && window.dispatcherApp.startPTT();
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        const key = e.key.length === 1 ? e.key : (e.code === 'Space' ? ' ' : '');
+        if (pttKeyDown && key && key.toLowerCase() === ui.pttKey.toLowerCase()) {
+            pttKeyDown = false;
+            window.dispatcherApp && window.dispatcherApp.stopPTT();
+        }
+    });
 
     console.log('[QuokkaDispatcher] Ready');
 });

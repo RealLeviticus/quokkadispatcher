@@ -5,11 +5,9 @@
 class DispatcherWSClient {
     /**
      * @param {string} serverUrl - WebSocket URL (e.g., 'ws://127.0.0.1:30125')
-     * @param {string} authToken - Auth token matching the FiveM resource config
      */
-    constructor(serverUrl, authToken) {
+    constructor(serverUrl) {
         this.serverUrl = serverUrl;
-        this.authToken = authToken;
         this.clientId = crypto.randomUUID();
         /** @type {WebSocket|null} */
         this.ws = null;
@@ -18,7 +16,6 @@ class DispatcherWSClient {
         this.reconnectInterval = 5000;
         this.reconnectTimer = null;
         this.connected = false;
-        this.authenticated = false;
         this.pingInterval = null;
     }
 
@@ -26,26 +23,15 @@ class DispatcherWSClient {
         if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
             return;
         }
-
         this.ws = new WebSocket(this.serverUrl);
-
         this.ws.onopen = () => {
             this.connected = true;
             this._dispatch('_connectionStateChanged', { connected: true });
-
-            // Send authentication
-            this._send({
-                type: 'AUTH',
-                token: this.authToken,
-                clientId: this.clientId,
-            });
-
             // Start ping keepalive
             this.pingInterval = setInterval(() => {
                 this.send('PING', {});
             }, 25000);
         };
-
         this.ws.onmessage = (event) => {
             let msg;
             try {
@@ -53,26 +39,13 @@ class DispatcherWSClient {
             } catch {
                 return;
             }
-
-            if (msg.type === 'AUTH_OK') {
-                this.authenticated = true;
-                this._dispatch('_authStateChanged', { authenticated: true });
-            } else if (msg.type === 'AUTH_FAILED') {
-                this.authenticated = false;
-                this._dispatch('_authStateChanged', { authenticated: false, reason: msg.data?.reason });
-                this.disconnect();
-                return;
-            }
-
             this._dispatch(msg.type, msg.data || {});
         };
-
         this.ws.onclose = () => {
             this._cleanup();
             this._dispatch('_connectionStateChanged', { connected: false });
             this._scheduleReconnect();
         };
-
         this.ws.onerror = () => {
             // onclose will fire after this
         };

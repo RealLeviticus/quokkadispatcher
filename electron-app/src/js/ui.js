@@ -43,13 +43,39 @@ class UIManager {
         this.endCallBtn = document.getElementById('endCallBtn');
         this.closeCallViewBtn = document.getElementById('closeCallViewBtn');
 
-        // Input fields
+        // Input field
         this.serverUrlInput = document.getElementById('serverUrl');
-        this.authTokenInput = document.getElementById('authToken');
-        this.dispatcherLicenseInput = document.getElementById('dispatcherLicense');
 
         // Audio
         this.incomingCallSound = document.getElementById('incomingCallSound');
+        
+        // PTT Key
+        this.pttKeyInput = document.getElementById('pttKeyInput');
+        this.pttKeyDisplay = document.getElementById('pttKeyDisplay');
+        this.pttKey = localStorage.getItem('qd_pttKey') || ' '; // Default: spacebar
+        this.updatePTTKeyDisplay();
+        
+        // Listen for key input
+        if (this.pttKeyInput) {
+            this.pttKeyInput.value = this.pttKey;
+            this.pttKeyInput.addEventListener('keydown', (e) => {
+                e.preventDefault();
+                let key = e.key.length === 1 ? e.key : (e.code === 'Space' ? ' ' : '');
+                if (key) {
+                    this.pttKey = key;
+                    this.pttKeyInput.value = key;
+                    localStorage.setItem('qd_pttKey', key);
+                    this.updatePTTKeyDisplay();
+                }
+            });
+        }
+    }
+
+    updatePTTKeyDisplay() {
+        if (this.pttKeyDisplay) {
+            let label = this.pttKey === ' ' ? 'Spacebar' : this.pttKey.toUpperCase();
+            this.pttKeyDisplay.textContent = `Current: ${label}`;
+        }
     }
 
     /**
@@ -98,8 +124,6 @@ class UIManager {
     getConnectionConfig() {
         return {
             serverUrl: this.serverUrlInput.value.trim(),
-            authToken: this.authTokenInput.value.trim(),
-            dispatcherLicense: this.dispatcherLicenseInput.value.trim(),
         };
     }
 

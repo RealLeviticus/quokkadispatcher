@@ -94,6 +94,28 @@ RegisterCommand('calldispatch', function(source)
     end
 end, false)
 
+-- /000 command for emergency calls, routes to dispatch
+RegisterCommand('000', function(source)
+    if source == 0 then return end -- ignore console
+
+    local playerName = getPlayerDisplayName(source)
+    local success = RouteCallToDispatcher(source, playerName)
+
+    if success then
+        TriggerClientEvent('ox_lib:notify', source, {
+            title = 'Dispatch',
+            description = 'Calling dispatch... please wait.',
+            type = 'inform',
+        })
+    else
+        TriggerClientEvent('ox_lib:notify', source, {
+            title = 'Dispatch',
+            description = 'No dispatchers available. Try again later.',
+            type = 'error',
+        })
+    end
+end, false)
+
 -- ============================================================
 -- Answer a call
 -- ============================================================
